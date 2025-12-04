@@ -1,0 +1,4 @@
+- source: gapminder_dashboard.qmd
+  quarto-pub:
+    - id: 6db3d117-288a-4f24-82cc-1928fcd652b4
+      url: 'https://danico.quarto.pub/gapminder-1952-2007'
