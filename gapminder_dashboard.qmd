@@ -1,0 +1,879 @@
+---
+title: "Global Development Analysis (1952-2007)"
+format: 
+  dashboard:
+    theme: cosmo
+    nav-buttons: [github]
+    orientation: columns
+    scrolling: true
+---
+
+```{=html}
+<script>
+// Add photo and name link to navbar on page load
+document.addEventListener('DOMContentLoaded', function() {
+  const navbar = document.querySelector('.navbar');
+  if (navbar) {
+    // Create container for photo and name
+    const userInfo = document.createElement('div');
+    userInfo.style.cssText = 'margin-left: auto; display: flex; align-items: center; gap: 10px; padding-right: 15px;';
+    
+    // Create photo element
+    const photo = document.createElement('img');
+    photo.src = 'danico-photo.jpg';
+    photo.alt = 'Danico';
+    photo.style.cssText = 'width: 35px; height: 35px; border-radius: 50%; object-fit: cover; border: 2px solid #0d6efd;';
+    
+    // Create clickable name link
+    const nameLink = document.createElement('a');
+    nameLink.href = 'https://daniel-conteh.vercel.app/';
+    nameLink.target = '_blank';
+    nameLink.textContent = 'Danico';
+    nameLink.style.cssText = 'font-weight: 600; color: #212529; font-size: 0.95em; text-decoration: none; transition: color 0.3s ease;';
+    nameLink.onmouseover = function() { this.style.color = '#0d6efd'; };
+    nameLink.onmouseout = function() { this.style.color = '#212529'; };
+    
+    // Append elements
+    userInfo.appendChild(photo);
+    userInfo.appendChild(nameLink);
+    navbar.appendChild(userInfo);
+  }
+});
+</script>
+```
+
+```{r}
+#| label: setup
+#| include: false
+
+# ============================================================================
+# SETUP: Load Libraries and Prepare Data
+# ============================================================================
+library(gapminder)
+library(dplyr)
+library(ggplot2)
+library(highcharter)
+
+latest_year <- max(gapminder$year)
+latest_data <- gapminder %>% filter(year == latest_year)
+
+total_population <- sum(latest_data$pop)
+avg_gdp <- mean(latest_data$gdpPercap)
+avg_life_exp <- mean(latest_data$lifeExp)
+num_countries <- n_distinct(latest_data$country)
+```
+
+# Global
+
+## Row {height="20%"}
+
+```{r}
+#| content: valuebox
+#| title: "Total Population"
+list(
+  icon = "people-fill",
+  color = "primary",
+  value = paste0(round(total_population / 1e9, 2), "B")
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Average GDP per Capita"
+list(
+  icon = "currency-dollar",
+  color = "success",
+  value = paste0("$", format(round(avg_gdp), big.mark = ","))
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Average Life Expectancy"
+list(
+  icon = "heart-pulse-fill",
+  color = "info",
+  value = paste0(round(avg_life_exp, 1), " years")
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Number of Countries"
+list(
+  icon = "globe",
+  color = "warning",
+  value = num_countries
+)
+```
+
+## Row {height="40%"}
+
+### Economic & Health Trends
+
+```{r}
+#| title: Economic & Health Trends
+
+trend_data <- gapminder %>%
+  group_by(year) %>%
+  summarise(
+    avg_gdp = mean(gdpPercap),
+    avg_life_exp = mean(lifeExp)
+  )
+
+highchart() %>%
+  hc_add_series(trend_data, "line", hcaes(x = year, y = avg_gdp), 
+                name = "GDP per Capita", yAxis = 0) %>%
+  hc_add_series(trend_data, "line", hcaes(x = year, y = avg_life_exp), 
+                name = "Life Expectancy", yAxis = 1) %>%
+  hc_yAxis_multiples(
+    list(title = list(text = "GDP per Capita ($)"), opposite = FALSE),
+    list(title = list(text = "Life Expectancy (years)"), opposite = TRUE)
+  ) %>%
+  hc_xAxis(title = list(text = "Year")) %>%
+  hc_tooltip(shared = TRUE, crosshairs = TRUE) %>%
+  hc_colors(c("#2E86AB", "#A23B72")) %>%
+  hc_chart(zoomType = "x") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+### Life Expectancy Trend
+
+```{r}
+#| title: Life Expectancy Trend
+
+continent_trend <- gapminder %>%
+  group_by(year, continent) %>%
+  summarise(avg_life_exp = mean(lifeExp), .groups = "drop")
+
+hchart(continent_trend, "line", hcaes(x = year, y = avg_life_exp, group = continent)) %>%
+  hc_xAxis(title = list(text = "Year")) %>%
+  hc_yAxis(title = list(text = "Average Life Expectancy (years)")) %>%
+  hc_tooltip(shared = TRUE, crosshairs = TRUE) %>%
+  hc_chart(zoomType = "x") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+## Row {height="40%"}
+
+### GDP vs Life Expectancy (Latest Year)
+
+```{r}
+#| title: GDP vs Life Expectancy (Latest Year)
+
+hchart(latest_data, "scatter", hcaes(x = gdpPercap, y = lifeExp, group = continent, size = pop, name = country)) %>%
+  hc_xAxis(type = "logarithmic", title = list(text = "GDP per Capita (log scale)")) %>%
+  hc_yAxis(title = list(text = "Life Expectancy (years)")) %>%
+  hc_tooltip(pointFormat = "<b>{point.name}</b><br/>GDP: ${point.x:,.0f}<br/>Life Exp: {point.y:.1f} years<br/>Pop: {point.z:,.0f}") %>%
+  hc_chart(zoomType = "xy") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+## Row {height="40%"}
+
+### Population by Country (Latest Year)
+
+```{r}
+#| title: Population by Country (Latest Year)
+
+top_pop <- latest_data %>%
+  arrange(desc(pop)) %>%
+  head(15) %>%
+  mutate(pop_millions = pop / 1e6)
+
+hchart(top_pop, "bar", hcaes(x = country, y = pop_millions, group = continent)) %>%
+  hc_xAxis(title = list(text = "")) %>%
+  hc_yAxis(title = list(text = "Population (millions)")) %>%
+  hc_tooltip(pointFormat = "{point.y:.1f} million") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+### Life Expectancy by Country (Latest Year)
+
+```{r}
+#| title: Life Expectancy by Country (Latest Year)
+
+top_life <- latest_data %>%
+  arrange(desc(lifeExp)) %>%
+  head(15)
+
+hchart(top_life, "bar", hcaes(x = country, y = lifeExp, group = continent)) %>%
+  hc_xAxis(title = list(text = "")) %>%
+  hc_yAxis(title = list(text = "Life Expectancy (years)")) %>%
+  hc_tooltip(pointFormat = "{point.y:.1f} years") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+# Africa
+
+```{r}
+#| label: africa-setup
+#| include: false
+
+africa_data <- gapminder %>% filter(continent == "Africa")
+africa_latest <- africa_data %>% filter(year == latest_year)
+
+africa_pop <- sum(africa_latest$pop)
+africa_gdp <- mean(africa_latest$gdpPercap)
+africa_life <- mean(africa_latest$lifeExp)
+africa_countries <- n_distinct(africa_latest$country)
+```
+
+## Row {height="20%"}
+
+```{r}
+#| content: valuebox
+#| title: "Total Population"
+list(
+  icon = "people-fill",
+  color = "primary",
+  value = paste0(round(africa_pop / 1e9, 2), "B")
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Average GDP per Capita"
+list(
+  icon = "currency-dollar",
+  color = "success",
+  value = paste0("$", format(round(africa_gdp), big.mark = ","))
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Average Life Expectancy"
+list(
+  icon = "heart-pulse-fill",
+  color = "info",
+  value = paste0(round(africa_life, 1), " years")
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Number of Countries"
+list(
+  icon = "globe",
+  color = "warning",
+  value = africa_countries
+)
+```
+
+## Row {height="40%"}
+
+### Economic & Health Trends - Africa
+
+```{r}
+#| title: Economic & Health Trends - Africa
+
+africa_trend <- africa_data %>%
+  group_by(year) %>%
+  summarise(
+    avg_gdp = mean(gdpPercap),
+    avg_life_exp = mean(lifeExp)
+  )
+
+highchart() %>%
+  hc_add_series(africa_trend, "line", hcaes(x = year, y = avg_gdp), name = "GDP per Capita", yAxis = 0) %>%
+  hc_add_series(africa_trend, "line", hcaes(x = year, y = avg_life_exp), name = "Life Expectancy", yAxis = 1) %>%
+  hc_yAxis_multiples(
+    list(title = list(text = "GDP per Capita ($)"), opposite = FALSE),
+    list(title = list(text = "Life Expectancy (years)"), opposite = TRUE)
+  ) %>%
+  hc_xAxis(title = list(text = "Year")) %>%
+  hc_tooltip(shared = TRUE) %>%
+  hc_colors(c("#2E86AB", "#A23B72")) %>%
+  hc_chart(zoomType = "x") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+### GDP vs Life Expectancy - Africa
+
+```{r}
+#| title: GDP vs Life Expectancy - Africa
+
+hchart(africa_latest, "scatter", hcaes(x = gdpPercap, y = lifeExp, size = pop, name = country)) %>%
+  hc_xAxis(type = "logarithmic", title = list(text = "GDP per Capita (log scale)")) %>%
+  hc_yAxis(title = list(text = "Life Expectancy (years)")) %>%
+  hc_tooltip(pointFormat = "<b>{point.name}</b><br/>GDP: ${point.x:,.0f}<br/>Life Exp: {point.y:.1f} years") %>%
+  hc_colors("#E63946") %>%
+  hc_chart(zoomType = "xy") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+## Row {height="40%"}
+
+### Population by Country - Africa
+
+```{r}
+#| title: Population by Country - Africa
+
+top_africa_pop <- africa_latest %>%
+  arrange(desc(pop)) %>%
+  head(10) %>%
+  mutate(pop_millions = pop / 1e6)
+
+hchart(top_africa_pop, "bar", hcaes(x = country, y = pop_millions)) %>%
+  hc_xAxis(title = list(text = "")) %>%
+  hc_yAxis(title = list(text = "Population (millions)")) %>%
+  hc_tooltip(pointFormat = "{point.y:.1f} million") %>%
+  hc_colors("#E63946") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+### Life Expectancy by Country - Africa
+
+```{r}
+#| title: Life Expectancy by Country - Africa
+
+top_africa_life <- africa_latest %>%
+  arrange(desc(lifeExp)) %>%
+  head(10)
+
+hchart(top_africa_life, "bar", hcaes(x = country, y = lifeExp)) %>%
+  hc_xAxis(title = list(text = "")) %>%
+  hc_yAxis(title = list(text = "Life Expectancy (years)")) %>%
+  hc_tooltip(pointFormat = "{point.y:.1f} years") %>%
+  hc_colors("#457B9D") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+# Asia
+
+```{r}
+#| label: asia-setup
+#| include: false
+
+asia_data <- gapminder %>% filter(continent == "Asia")
+asia_latest <- asia_data %>% filter(year == latest_year)
+
+asia_pop <- sum(asia_latest$pop)
+asia_gdp <- mean(asia_latest$gdpPercap)
+asia_life <- mean(asia_latest$lifeExp)
+asia_countries <- n_distinct(asia_latest$country)
+```
+
+## Row {height="20%"}
+
+```{r}
+#| content: valuebox
+#| title: "Total Population"
+list(
+  icon = "people-fill",
+  color = "primary",
+  value = paste0(round(asia_pop / 1e9, 2), "B")
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Average GDP per Capita"
+list(
+  icon = "currency-dollar",
+  color = "success",
+  value = paste0("$", format(round(asia_gdp), big.mark = ","))
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Average Life Expectancy"
+list(
+  icon = "heart-pulse-fill",
+  color = "info",
+  value = paste0(round(asia_life, 1), " years")
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Number of Countries"
+list(
+  icon = "globe",
+  color = "warning",
+  value = asia_countries
+)
+```
+
+## Row {height="40%"}
+
+### Economic & Health Trends - Asia
+
+```{r}
+#| title: Economic & Health Trends - Asia
+
+asia_trend <- asia_data %>%
+  group_by(year) %>%
+  summarise(
+    avg_gdp = mean(gdpPercap),
+    avg_life_exp = mean(lifeExp)
+  )
+
+highchart() %>%
+  hc_add_series(asia_trend, "line", hcaes(x = year, y = avg_gdp), name = "GDP per Capita", yAxis = 0) %>%
+  hc_add_series(asia_trend, "line", hcaes(x = year, y = avg_life_exp), name = "Life Expectancy", yAxis = 1) %>%
+  hc_yAxis_multiples(
+    list(title = list(text = "GDP per Capita ($)"), opposite = FALSE),
+    list(title = list(text = "Life Expectancy (years)"), opposite = TRUE)
+  ) %>%
+  hc_xAxis(title = list(text = "Year")) %>%
+  hc_tooltip(shared = TRUE) %>%
+  hc_colors(c("#2E86AB", "#A23B72")) %>%
+  hc_chart(zoomType = "x") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+### GDP vs Life Expectancy - Asia
+
+```{r}
+#| title: GDP vs Life Expectancy - Asia
+
+hchart(asia_latest, "scatter", hcaes(x = gdpPercap, y = lifeExp, size = pop, name = country)) %>%
+  hc_xAxis(type = "logarithmic", title = list(text = "GDP per Capita (log scale)")) %>%
+  hc_yAxis(title = list(text = "Life Expectancy (years)")) %>%
+  hc_tooltip(pointFormat = "<b>{point.name}</b><br/>GDP: ${point.x:,.0f}<br/>Life Exp: {point.y:.1f} years") %>%
+  hc_colors("#F77F00") %>%
+  hc_chart(zoomType = "xy") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+## Row {height="40%"}
+
+### Population by Country - Asia
+
+```{r}
+#| title: Population by Country - Asia
+
+top_asia_pop <- asia_latest %>%
+  arrange(desc(pop)) %>%
+  head(10) %>%
+  mutate(pop_millions = pop / 1e6)
+
+hchart(top_asia_pop, "bar", hcaes(x = country, y = pop_millions)) %>%
+  hc_xAxis(title = list(text = "")) %>%
+  hc_yAxis(title = list(text = "Population (millions)")) %>%
+  hc_tooltip(pointFormat = "{point.y:.1f} million") %>%
+  hc_colors("#F77F00") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+### Life Expectancy by Country - Asia
+
+```{r}
+#| title: Life Expectancy by Country - Asia
+
+top_asia_life <- asia_latest %>%
+  arrange(desc(lifeExp)) %>%
+  head(10)
+
+hchart(top_asia_life, "bar", hcaes(x = country, y = lifeExp)) %>%
+  hc_xAxis(title = list(text = "")) %>%
+  hc_yAxis(title = list(text = "Life Expectancy (years)")) %>%
+  hc_tooltip(pointFormat = "{point.y:.1f} years") %>%
+  hc_colors("#06A77D") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+# Americas
+
+```{r}
+#| label: americas-setup
+#| include: false
+
+americas_data <- gapminder %>% filter(continent == "Americas")
+americas_latest <- americas_data %>% filter(year == latest_year)
+
+americas_pop <- sum(americas_latest$pop)
+americas_gdp <- mean(americas_latest$gdpPercap)
+americas_life <- mean(americas_latest$lifeExp)
+americas_countries <- n_distinct(americas_latest$country)
+```
+
+## Row {height="20%"}
+
+```{r}
+#| content: valuebox
+#| title: "Total Population"
+list(
+  icon = "people-fill",
+  color = "primary",
+  value = paste0(round(americas_pop / 1e6), "M")
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Average GDP per Capita"
+list(
+  icon = "currency-dollar",
+  color = "success",
+  value = paste0("$", format(round(americas_gdp), big.mark = ","))
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Average Life Expectancy"
+list(
+  icon = "heart-pulse-fill",
+  color = "info",
+  value = paste0(round(americas_life, 1), " years")
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Number of Countries"
+list(
+  icon = "globe",
+  color = "warning",
+  value = americas_countries
+)
+```
+
+## Row {height="40%"}
+
+### Economic & Health Trends - Americas
+
+```{r}
+#| title: Economic & Health Trends - Americas
+
+americas_trend <- americas_data %>%
+  group_by(year) %>%
+  summarise(
+    avg_gdp = mean(gdpPercap),
+    avg_life_exp = mean(lifeExp)
+  )
+
+highchart() %>%
+  hc_add_series(americas_trend, "line", hcaes(x = year, y = avg_gdp), name = "GDP per Capita", yAxis = 0) %>%
+  hc_add_series(americas_trend, "line", hcaes(x = year, y = avg_life_exp), name = "Life Expectancy", yAxis = 1) %>%
+  hc_yAxis_multiples(
+    list(title = list(text = "GDP per Capita ($)"), opposite = FALSE),
+    list(title = list(text = "Life Expectancy (years)"), opposite = TRUE)
+  ) %>%
+  hc_xAxis(title = list(text = "Year")) %>%
+  hc_tooltip(shared = TRUE) %>%
+  hc_colors(c("#2E86AB", "#A23B72")) %>%
+  hc_chart(zoomType = "x") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+### GDP vs Life Expectancy - Americas
+
+```{r}
+#| title: GDP vs Life Expectancy - Americas
+
+hchart(americas_latest, "scatter", hcaes(x = gdpPercap, y = lifeExp, size = pop, name = country)) %>%
+  hc_xAxis(type = "logarithmic", title = list(text = "GDP per Capita (log scale)")) %>%
+  hc_yAxis(title = list(text = "Life Expectancy (years)")) %>%
+  hc_tooltip(pointFormat = "<b>{point.name}</b><br/>GDP: ${point.x:,.0f}<br/>Life Exp: {point.y:.1f} years") %>%
+  hc_colors("#06A77D") %>%
+  hc_chart(zoomType = "xy") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+## Row {height="40%"}
+
+### Population by Country - Americas
+
+```{r}
+#| title: Population by Country - Americas
+
+top_americas_pop <- americas_latest %>%
+  arrange(desc(pop)) %>%
+  head(10) %>%
+  mutate(pop_millions = pop / 1e6)
+
+hchart(top_americas_pop, "bar", hcaes(x = country, y = pop_millions)) %>%
+  hc_xAxis(title = list(text = "")) %>%
+  hc_yAxis(title = list(text = "Population (millions)")) %>%
+  hc_tooltip(pointFormat = "{point.y:.1f} million") %>%
+  hc_colors("#06A77D") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+### Life Expectancy by Country - Americas
+
+```{r}
+#| title: Life Expectancy by Country - Americas
+
+top_americas_life <- americas_latest %>%
+  arrange(desc(lifeExp)) %>%
+  head(10)
+
+hchart(top_americas_life, "bar", hcaes(x = country, y = lifeExp)) %>%
+  hc_xAxis(title = list(text = "")) %>%
+  hc_yAxis(title = list(text = "Life Expectancy (years)")) %>%
+  hc_tooltip(pointFormat = "{point.y:.1f} years") %>%
+  hc_colors("#D62828") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+# Europe
+
+```{r}
+#| label: europe-setup
+#| include: false
+
+europe_data <- gapminder %>% filter(continent == "Europe")
+europe_latest <- europe_data %>% filter(year == latest_year)
+
+europe_pop <- sum(europe_latest$pop)
+europe_gdp <- mean(europe_latest$gdpPercap)
+europe_life <- mean(europe_latest$lifeExp)
+europe_countries <- n_distinct(europe_latest$country)
+```
+
+## Row {height="20%"}
+
+```{r}
+#| content: valuebox
+#| title: "Total Population"
+list(
+  icon = "people-fill",
+  color = "primary",
+  value = paste0(round(europe_pop / 1e6), "M")
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Average GDP per Capita"
+list(
+  icon = "currency-dollar",
+  color = "success",
+  value = paste0("$", format(round(europe_gdp), big.mark = ","))
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Average Life Expectancy"
+list(
+  icon = "heart-pulse-fill",
+  color = "info",
+  value = paste0(round(europe_life, 1), " years")
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Number of Countries"
+list(
+  icon = "globe",
+  color = "warning",
+  value = europe_countries
+)
+```
+
+## Row {height="40%"}
+
+### Economic & Health Trends - Europe
+
+```{r}
+#| title: Economic & Health Trends - Europe
+
+europe_trend <- europe_data %>%
+  group_by(year) %>%
+  summarise(
+    avg_gdp = mean(gdpPercap),
+    avg_life_exp = mean(lifeExp)
+  )
+
+highchart() %>%
+  hc_add_series(europe_trend, "line", hcaes(x = year, y = avg_gdp), name = "GDP per Capita", yAxis = 0) %>%
+  hc_add_series(europe_trend, "line", hcaes(x = year, y = avg_life_exp), name = "Life Expectancy", yAxis = 1) %>%
+  hc_yAxis_multiples(
+    list(title = list(text = "GDP per Capita ($)"), opposite = FALSE),
+    list(title = list(text = "Life Expectancy (years)"), opposite = TRUE)
+  ) %>%
+  hc_xAxis(title = list(text = "Year")) %>%
+  hc_tooltip(shared = TRUE) %>%
+  hc_colors(c("#2E86AB", "#A23B72")) %>%
+  hc_chart(zoomType = "x") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+### GDP vs Life Expectancy - Europe
+
+```{r}
+#| title: GDP vs Life Expectancy - Europe
+
+hchart(europe_latest, "scatter", hcaes(x = gdpPercap, y = lifeExp, size = pop, name = country)) %>%
+  hc_xAxis(type = "logarithmic", title = list(text = "GDP per Capita (log scale)")) %>%
+  hc_yAxis(title = list(text = "Life Expectancy (years)")) %>%
+  hc_tooltip(pointFormat = "<b>{point.name}</b><br/>GDP: ${point.x:,.0f}<br/>Life Exp: {point.y:.1f} years") %>%
+  hc_colors("#4361EE") %>%
+  hc_chart(zoomType = "xy") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+## Row {height="40%"}
+
+### Population by Country - Europe
+
+```{r}
+#| title: Population by Country - Europe
+
+top_europe_pop <- europe_latest %>%
+  arrange(desc(pop)) %>%
+  head(10) %>%
+  mutate(pop_millions = pop / 1e6)
+
+hchart(top_europe_pop, "bar", hcaes(x = country, y = pop_millions)) %>%
+  hc_xAxis(title = list(text = "")) %>%
+  hc_yAxis(title = list(text = "Population (millions)")) %>%
+  hc_tooltip(pointFormat = "{point.y:.1f} million") %>%
+  hc_colors("#4361EE") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+### Life Expectancy by Country - Europe
+
+```{r}
+#| title: Life Expectancy by Country - Europe
+
+top_europe_life <- europe_latest %>%
+  arrange(desc(lifeExp)) %>%
+  head(10)
+
+hchart(top_europe_life, "bar", hcaes(x = country, y = lifeExp)) %>%
+  hc_xAxis(title = list(text = "")) %>%
+  hc_yAxis(title = list(text = "Life Expectancy (years)")) %>%
+  hc_tooltip(pointFormat = "{point.y:.1f} years") %>%
+  hc_colors("#7209B7") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+# Oceania
+
+```{r}
+#| label: oceania-setup
+#| include: false
+
+oceania_data <- gapminder %>% filter(continent == "Oceania")
+oceania_latest <- oceania_data %>% filter(year == latest_year)
+
+oceania_pop <- sum(oceania_latest$pop)
+oceania_gdp <- mean(oceania_latest$gdpPercap)
+oceania_life <- mean(oceania_latest$lifeExp)
+oceania_countries <- n_distinct(oceania_latest$country)
+```
+
+## Row {height="20%"}
+
+```{r}
+#| content: valuebox
+#| title: "Total Population"
+list(
+  icon = "people-fill",
+  color = "primary",
+  value = paste0(round(oceania_pop / 1e6), "M")
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Average GDP per Capita"
+list(
+  icon = "currency-dollar",
+  color = "success",
+  value = paste0("$", format(round(oceania_gdp), big.mark = ","))
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Average Life Expectancy"
+list(
+  icon = "heart-pulse-fill",
+  color = "info",
+  value = paste0(round(oceania_life, 1), " years")
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Number of Countries"
+list(
+  icon = "globe",
+  color = "warning",
+  value = oceania_countries
+)
+```
+
+## Row {height="40%"}
+
+### Economic & Health Trends - Oceania
+
+```{r}
+#| title: Economic & Health Trends - Oceania
+
+oceania_trend <- oceania_data %>%
+  group_by(year) %>%
+  summarise(
+    avg_gdp = mean(gdpPercap),
+    avg_life_exp = mean(lifeExp)
+  )
+
+highchart() %>%
+  hc_add_series(oceania_trend, "line", hcaes(x = year, y = avg_gdp), name = "GDP per Capita", yAxis = 0) %>%
+  hc_add_series(oceania_trend, "line", hcaes(x = year, y = avg_life_exp), name = "Life Expectancy", yAxis = 1) %>%
+  hc_yAxis_multiples(
+    list(title = list(text = "GDP per Capita ($)"), opposite = FALSE),
+    list(title = list(text = "Life Expectancy (years)"), opposite = TRUE)
+  ) %>%
+  hc_xAxis(title = list(text = "Year")) %>%
+  hc_tooltip(shared = TRUE) %>%
+  hc_colors(c("#2E86AB", "#A23B72")) %>%
+  hc_chart(zoomType = "x") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+### GDP vs Life Expectancy - Oceania
+
+```{r}
+#| title: GDP vs Life Expectancy - Oceania
+
+hchart(oceania_latest, "scatter", hcaes(x = gdpPercap, y = lifeExp, size = pop, name = country)) %>%
+  hc_xAxis(type = "logarithmic", title = list(text = "GDP per Capita (log scale)")) %>%
+  hc_yAxis(title = list(text = "Life Expectancy (years)")) %>%
+  hc_tooltip(pointFormat = "<b>{point.name}</b><br/>GDP: ${point.x:,.0f}<br/>Life Exp: {point.y:.1f} years") %>%
+  hc_colors("#06FFA5") %>%
+  hc_chart(zoomType = "xy") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+## Row {height="40%"}
+
+### Population by Country - Oceania
+
+```{r}
+#| title: Population by Country - Oceania
+
+oceania_latest_pop <- oceania_latest %>%
+  mutate(pop_millions = pop / 1e6)
+
+hchart(oceania_latest_pop, "bar", hcaes(x = country, y = pop_millions)) %>%
+  hc_xAxis(title = list(text = "")) %>%
+  hc_yAxis(title = list(text = "Population (millions)")) %>%
+  hc_tooltip(pointFormat = "{point.y:.1f} million") %>%
+  hc_colors("#06FFA5") %>%
+  hc_exporting(enabled = TRUE)
+```
+
+### Life Expectancy by Country - Oceania
+
+```{r}
+#| title: Life Expectancy by Country - Oceania
+
+hchart(oceania_latest, "bar", hcaes(x = country, y = lifeExp)) %>%
+  hc_xAxis(title = list(text = "")) %>%
+  hc_yAxis(title = list(text = "Life Expectancy (years)")) %>%
+  hc_tooltip(pointFormat = "{point.y:.1f} years") %>%
+  hc_colors("#FF006E") %>%
+  hc_exporting(enabled = TRUE)
+```
