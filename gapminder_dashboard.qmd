@@ -6,6 +6,7 @@ format:
     nav-buttons: [github]
     orientation: columns
     scrolling: true
+    embed-resources: true
 ---
 
 ```{=html}
@@ -20,7 +21,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Create photo element
     const photo = document.createElement('img');
-    photo.src = 'danico-photo.jpg';
+    photo.src = 'https://daniel-conteh.vercel.app/_next/image?url=%2Fdanico.png&w=384&q=75';
     photo.alt = 'Danico';
     photo.style.cssText = 'width: 35px; height: 35px; border-radius: 50%; object-fit: cover; border: 2px solid #0d6efd;';
     
