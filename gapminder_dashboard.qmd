@@ -12,6 +12,8 @@ format:
     embed-resources: true
 ---
 
+
+
 ```{=html}
 <script>
 // Add photo and name link to navbar on page load
