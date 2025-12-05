@@ -3,7 +3,10 @@ title: "Global Development Analysis (1952-2007)"
 format: 
   dashboard:
     theme: cosmo
-    nav-buttons: [github]
+    nav-buttons: 
+      - icon: linkedin
+        href: https://www.linkedin.com/in/daniel-conteh-0b8861304
+      - github
     orientation: columns
     scrolling: true
     embed-resources: true
